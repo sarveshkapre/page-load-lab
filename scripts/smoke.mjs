@@ -11,8 +11,52 @@ function startDevServer() {
   const child = spawn("npm", ["run", "dev", "--", "-p", String(port)], {
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
+    // Put the dev server in its own process group so we can reliably stop it in CI.
+    detached: process.platform !== "win32",
   });
   return child;
+}
+
+function killChild(child, signal) {
+  if (!child.pid) return;
+  // On POSIX: negative PID targets the whole process group (requires detached spawn).
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall back to killing just the parent process.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // Ignore.
+  }
+}
+
+function waitForExit(child, timeoutMs) {
+  return new Promise((resolve) => {
+    if (child.exitCode != null) return resolve();
+    const t = setTimeout(() => resolve(), timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(t);
+      resolve();
+    });
+    child.once("close", () => {
+      clearTimeout(t);
+      resolve();
+    });
+  });
+}
+
+async function stopDevServer(child) {
+  if (!child || child.exitCode != null) return;
+  killChild(child, "SIGTERM");
+  await waitForExit(child, 3000);
+  if (child.exitCode != null) return;
+  killChild(child, "SIGKILL");
+  await waitForExit(child, 3000);
 }
 
 async function waitForReady(child, timeoutMs) {
@@ -72,7 +116,7 @@ async function main() {
 
     process.stdout.write(`smoke ok: HTTP ${res.status}\n`);
   } finally {
-    child.kill("SIGTERM");
+    await stopDevServer(child);
   }
 }
 
