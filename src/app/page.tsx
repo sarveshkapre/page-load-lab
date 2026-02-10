@@ -20,18 +20,34 @@ type PsiOpportunity = {
 
 type PsiSummary = {
   fetchedAt: string;
+  status: number;
   perfScore: number | null;
   metrics: PsiMetric[];
   opportunities: PsiOpportunity[];
-  raw: unknown;
+  field?: {
+    overallCategory: string | null;
+    metrics: Array<{ id: string; percentile: number | null; category: string | null }>;
+  } | null;
+  raw?: unknown;
+};
+
+type PsiError = {
+  error: string;
+  fetchedAt: string;
+  status: number | null;
+  detail?: string;
+  hint?: string | null;
 };
 
 type PageLoadResponse = {
   url: string;
   source: string;
+  apiKeyConfigured?: boolean;
+  error?: string;
+  hint?: string;
   notes?: string[];
-  mobile: PsiSummary | { error: string; fetchedAt: string } | null;
-  desktop: PsiSummary | { error: string; fetchedAt: string } | null;
+  mobile: PsiSummary | PsiError | null;
+  desktop: PsiSummary | PsiError | null;
 };
 
 function pct(n: number | null) {
@@ -41,6 +57,7 @@ function pct(n: number | null) {
 
 export default function PageLoadLab() {
   const [url, setUrl] = useState("https://example.com");
+  const [strategy, setStrategy] = useState<"mobile" | "desktop" | "both">("mobile");
   const [data, setData] = useState<PageLoadResponse | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,13 +67,14 @@ export default function PageLoadLab() {
     setErr("");
     setData(null);
     try {
-      const res = await fetch(`/api/pageload?url=${encodeURIComponent(url.trim())}`, { cache: "no-store" });
+      const qs = new URLSearchParams({ url: url.trim(), strategy });
+      const res = await fetch(`/api/pageload?${qs.toString()}`, { cache: "no-store" });
       const json = (await res.json()) as PageLoadResponse;
+      setData(json);
       if (!res.ok) {
         const maybeError = (json as unknown as Record<string, unknown>)["error"];
-        throw new Error(typeof maybeError === "string" ? maybeError : `HTTP ${res.status}`);
+        setErr(typeof maybeError === "string" ? maybeError : `HTTP ${res.status}`);
       }
-      setData(json);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -64,11 +82,7 @@ export default function PageLoadLab() {
     }
   };
 
-  const mobile = useMemo(() => (data?.mobile && "perfScore" in data.mobile ? (data.mobile as PsiSummary) : null), [data]);
-  const desktop = useMemo(
-    () => (data?.desktop && "perfScore" in data.desktop ? (data.desktop as PsiSummary) : null),
-    [data],
-  );
+  const hasResults = useMemo(() => !!(data?.mobile || data?.desktop), [data]);
 
   return (
     <div className="grid gap-6">
@@ -88,6 +102,11 @@ export default function PageLoadLab() {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com"
           />
+          <div className="flex shrink-0 gap-2">
+            <StrategyPill label="Mobile" active={strategy === "mobile"} onClick={() => setStrategy("mobile")} />
+            <StrategyPill label="Desktop" active={strategy === "desktop"} onClick={() => setStrategy("desktop")} />
+            <StrategyPill label="Both" active={strategy === "both"} onClick={() => setStrategy("both")} />
+          </div>
           <button
             className="shrink-0 rounded-xl bg-sky-400/20 px-4 py-3 text-sm font-semibold text-sky-100 ring-1 ring-sky-300/30 hover:bg-sky-400/25 disabled:opacity-50"
             onClick={() => void run()}
@@ -99,6 +118,7 @@ export default function PageLoadLab() {
         {err ? (
           <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">
             {err}
+            {data?.hint ? <div className="mt-1 text-xs text-red-200/80">{data.hint}</div> : null}
           </div>
         ) : null}
       </section>
@@ -114,17 +134,65 @@ export default function PageLoadLab() {
         </section>
       ) : null}
 
-      {mobile || desktop ? (
+      {hasResults ? (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {mobile ? <SummaryPanel label="Mobile" summary={mobile} /> : null}
-          {desktop ? <SummaryPanel label="Desktop" summary={desktop} /> : null}
+          {data?.mobile ? <ResultPanel label="Mobile" result={data.mobile} /> : null}
+          {data?.desktop ? <ResultPanel label="Desktop" result={data.desktop} /> : null}
         </section>
       ) : null}
     </div>
   );
 }
 
-function SummaryPanel({ label, summary }: { label: string; summary: PsiSummary }) {
+function StrategyPill({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-xl px-3 py-3 text-sm font-semibold ring-1 transition",
+        active
+          ? "bg-white/10 text-white ring-white/20"
+          : "bg-black/20 text-white/70 ring-white/10 hover:bg-white/5 hover:text-white",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  );
+}
+
+function isSummary(x: PsiSummary | PsiError): x is PsiSummary {
+  return typeof x === "object" && x != null && "perfScore" in x;
+}
+
+function ResultPanel({ label, result }: { label: string; result: PsiSummary | PsiError }) {
+  if (!isSummary(result)) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 ring-1 ring-white/10">
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm font-semibold text-white/90">{label}</div>
+          <div className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200 ring-1 ring-red-400/20">
+            error {result.status ?? "-"}
+          </div>
+        </div>
+        <div className="mt-4 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">
+          {result.error}
+          {result.hint ? <div className="mt-1 text-xs text-red-200/80">{result.hint}</div> : null}
+          <div className="mt-2 font-mono text-xs text-white/55">fetched {result.fetchedAt}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const summary = result;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 ring-1 ring-white/10">
       <div className="flex items-center justify-between gap-4">
@@ -133,6 +201,7 @@ function SummaryPanel({ label, summary }: { label: string; summary: PsiSummary }
           perf {pct(summary.perfScore)}
         </div>
       </div>
+      <div className="mt-1 font-mono text-xs text-white/45">fetched {summary.fetchedAt}</div>
 
       <div className="mt-4 grid gap-3">
         <div className="text-xs font-semibold text-white/70">Key metrics</div>
@@ -145,6 +214,25 @@ function SummaryPanel({ label, summary }: { label: string; summary: PsiSummary }
           ))}
         </div>
       </div>
+
+      {summary.field?.metrics?.length ? (
+        <div className="mt-6 grid gap-3">
+          <div className="text-xs font-semibold text-white/70">
+            Field data (CrUX){summary.field.overallCategory ? `: ${summary.field.overallCategory}` : ""}
+          </div>
+          <div className="grid gap-2">
+            {summary.field.metrics.slice(0, 6).map((m) => (
+              <div key={m.id} className="flex items-start justify-between gap-4">
+                <div className="text-sm text-white/70">{m.id}</div>
+                <div className="text-right font-mono text-xs text-white/85">
+                  {m.percentile != null ? `p75 ${Math.round(m.percentile)}` : "-"}
+                  {m.category ? ` (${m.category})` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3">
         <div className="text-xs font-semibold text-white/70">Top “why slow?” opportunities</div>

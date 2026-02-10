@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Network Reactor",
-  description: "Minimal, modern internet diagnostics: page load, IP metadata, BGP/ASN, and speed tests.",
+  title: "Page Load Lab",
+  description: "Page performance profiler: URL in, Core Web Vitals out, plus ranked “why slow?” opportunities.",
 };
 
 export default function RootLayout({
@@ -33,33 +33,18 @@ export default function RootLayout({
             <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
               <Link href="/" className="group inline-flex items-center gap-2">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
-                  <span className="text-sm font-semibold tracking-tight">NR</span>
+                  <span className="text-sm font-semibold tracking-tight">PL</span>
                 </span>
-                <span className="text-sm font-semibold tracking-tight text-white/90 group-hover:text-white">
-                  Network Reactor
-                </span>
+                <span className="text-sm font-semibold tracking-tight text-white/90 group-hover:text-white">Page Load Lab</span>
               </Link>
-              <nav className="hidden items-center gap-2 text-sm md:flex">
-                <Link href="/page-load" className="rounded-full px-3 py-1 text-white/70 hover:bg-white/10 hover:text-white">
-                  Page Load
-                </Link>
-                <Link href="/my-ip" className="rounded-full px-3 py-1 text-white/70 hover:bg-white/10 hover:text-white">
-                  My IP
-                </Link>
-                <Link href="/bgp" className="rounded-full px-3 py-1 text-white/70 hover:bg-white/10 hover:text-white">
-                  BGP
-                </Link>
-                <Link href="/speedtest" className="rounded-full px-3 py-1 text-white/70 hover:bg-white/10 hover:text-white">
-                  Speed Test
-                </Link>
-              </nav>
+              <div className="text-xs text-white/55">PSI v1 now, Playwright v2 next</div>
             </div>
           </header>
           <main className="mx-auto w-full max-w-6xl px-4 py-10">{children}</main>
           <footer className="border-t border-white/10 bg-black/20">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-white/55 md:flex-row md:items-center md:justify-between">
               <div>
-                Built for fast diagnostics. Enrichment is best-effort; treat external data as approximate.
+                Built for page-load diagnostics. Treat third-party data as approximate; verify with real-user data when possible.
               </div>
               <div className="font-mono">v0.1</div>
             </div>

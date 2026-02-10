@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { SafeFetchResult, safeJsonFetch } from "@/lib/safeFetch";
+import { normalizeIp } from "@/lib/ip";
 
 type PsiResponse = Record<string, unknown>;
 
@@ -20,6 +21,17 @@ type LighthouseResult = {
     performance?: { score?: number };
   };
   audits?: Record<string, LhrAudit>;
+};
+
+type CruxMetric = {
+  percentile?: number;
+  category?: string;
+  distributions?: Array<{ min?: number; max?: number; proportion?: number }>;
+};
+
+type LoadingExperience = {
+  overall_category?: string;
+  metrics?: Record<string, CruxMetric>;
 };
 
 function validateUrl(input: string): { ok: true; url: string } | { ok: false; error: string } {
@@ -46,6 +58,24 @@ function pickAuditMetric(lhr: LighthouseResult | null, id: string) {
     displayValue: a.displayValue ?? "",
     numericValue: typeof a.numericValue === "number" ? a.numericValue : null,
     score: typeof a.score === "number" ? a.score : null,
+  };
+}
+
+function pickFieldMetrics(json: PsiResponse) {
+  // PSI v5: loadingExperience contains CrUX "field" data when available.
+  const le = (json["loadingExperience"] ?? null) as LoadingExperience | null;
+  if (!le?.metrics) return null;
+  const metrics = Object.entries(le.metrics)
+    .map(([id, m]) => ({
+      id,
+      percentile: typeof m?.percentile === "number" ? m.percentile : null,
+      category: typeof m?.category === "string" ? m.category : null,
+    }))
+    .filter((m) => m.percentile != null || m.category != null);
+  if (!metrics.length) return null;
+  return {
+    overallCategory: typeof le.overall_category === "string" ? le.overall_category : null,
+    metrics,
   };
 }
 
@@ -80,13 +110,72 @@ function pickOpportunities(lhr: LighthouseResult | null) {
   return out.slice(0, 12);
 }
 
-async function runPsi(targetUrl: string, strategy: "mobile" | "desktop") {
+const OK_CACHE_TTL_MS = 5 * 60 * 1000;
+const ERR_CACHE_TTL_MS = 30 * 1000;
+const CACHE_MAX_ENTRIES = 25;
+
+type CacheEntry = { expiresAt: number; value: SafeFetchResult<PsiResponse> };
+const psiCache = new Map<string, CacheEntry>();
+
+function cacheKey(targetUrl: string, strategy: "mobile" | "desktop", locale: string | null) {
+  return `${strategy}|${locale ?? ""}|${targetUrl}`;
+}
+
+function cacheGet(key: string): SafeFetchResult<PsiResponse> | null {
+  const hit = psiCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expiresAt) {
+    psiCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function cacheSet(key: string, value: SafeFetchResult<PsiResponse>) {
+  const ttl = value.ok ? OK_CACHE_TTL_MS : ERR_CACHE_TTL_MS;
+  psiCache.set(key, { expiresAt: Date.now() + ttl, value });
+  // Basic bounded cache to avoid unbounded memory growth.
+  if (psiCache.size <= CACHE_MAX_ENTRIES) return;
+  for (const [k, v] of psiCache) {
+    if (Date.now() > v.expiresAt) psiCache.delete(k);
+  }
+  while (psiCache.size > CACHE_MAX_ENTRIES) {
+    const first = psiCache.keys().next().value as string | undefined;
+    if (!first) break;
+    psiCache.delete(first);
+  }
+}
+
+type RateState = { resetAt: number; count: number };
+const rate = new Map<string, RateState>();
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = 10;
+
+function checkRateLimit(clientKey: string): { ok: true } | { ok: false; retryAfterSec: number } {
+  const now = Date.now();
+  const cur = rate.get(clientKey);
+  if (!cur || now >= cur.resetAt) {
+    rate.set(clientKey, { resetAt: now + RATE_WINDOW_MS, count: 1 });
+    return { ok: true };
+  }
+  if (cur.count >= RATE_LIMIT) {
+    return { ok: false, retryAfterSec: Math.max(1, Math.ceil((cur.resetAt - now) / 1000)) };
+  }
+  cur.count += 1;
+  return { ok: true };
+}
+
+async function runPsi(targetUrl: string, strategy: "mobile" | "desktop", locale: string | null) {
   const api = new URL("https://www.googleapis.com/pagespeedonline/v5/runPagespeed");
   api.searchParams.set("url", targetUrl);
   api.searchParams.set("strategy", strategy);
+  if (locale) api.searchParams.set("locale", locale);
   api.searchParams.append("category", "performance");
   api.searchParams.append("category", "best-practices");
   api.searchParams.append("category", "seo");
+
+  const key = process.env.PSI_API_KEY?.trim();
+  if (key) api.searchParams.set("key", key);
 
   return safeJsonFetch<PsiResponse>(api.toString(), { timeoutMs: 12000 });
 }
@@ -98,12 +187,66 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "missing query parameter url" }, { status: 400 });
   }
 
+  const strategyParam = (searchParams.get("strategy") ?? "mobile").trim().toLowerCase();
+  const includeRaw = (searchParams.get("includeRaw") ?? "").trim() === "1";
+  const debug = (searchParams.get("debug") ?? "").trim() === "1";
+  const locale = (searchParams.get("locale") ?? "").trim() || null;
+
   const v = validateUrl(raw);
   if (!v.ok) {
     return Response.json({ error: v.error }, { status: 400 });
   }
+  const targetUrl = v.url;
 
-  const [mobile, desktop] = await Promise.all([runPsi(v.url, "mobile"), runPsi(v.url, "desktop")]);
+  const wantMobile = strategyParam === "mobile" || strategyParam === "both";
+  const wantDesktop = strategyParam === "desktop" || strategyParam === "both";
+  if (!wantMobile && !wantDesktop) {
+    return Response.json({ error: "strategy must be mobile, desktop, or both" }, { status: 400 });
+  }
+
+  // If we need to make at least one upstream call, apply a small in-memory rate limit.
+  const clientIp =
+    normalizeIp(req.headers.get("x-forwarded-for")) ??
+    normalizeIp(req.headers.get("x-real-ip")) ??
+    normalizeIp(req.headers.get("cf-connecting-ip")) ??
+    null;
+
+  const cacheHits = {
+    mobile: wantMobile ? cacheGet(cacheKey(targetUrl, "mobile", locale)) : null,
+    desktop: wantDesktop ? cacheGet(cacheKey(targetUrl, "desktop", locale)) : null,
+  };
+
+  const needUpstream =
+    (wantMobile && !cacheHits.mobile) || (wantDesktop && !cacheHits.desktop) || includeRaw;
+
+  if (needUpstream) {
+    const rl = checkRateLimit(clientIp ?? "unknown");
+    if (!rl.ok) {
+      return Response.json(
+        {
+          error: "rate limit exceeded (try again soon)",
+          retryAfterSec: rl.retryAfterSec,
+        },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
+  }
+
+  async function getPsi(strategy: "mobile" | "desktop"): Promise<SafeFetchResult<PsiResponse>> {
+    // If includeRaw is requested, bypass cache so the caller can opt-in to large payloads intentionally.
+    if (!includeRaw) {
+      const hit = cacheGet(cacheKey(targetUrl, strategy, locale));
+      if (hit) return hit;
+    }
+    const res = await runPsi(targetUrl, strategy, locale);
+    if (!includeRaw) cacheSet(cacheKey(targetUrl, strategy, locale), res);
+    return res;
+  }
+
+  const [mobile, desktop] = await Promise.all([
+    wantMobile ? getPsi("mobile") : Promise.resolve(null),
+    wantDesktop ? getPsi("desktop") : Promise.resolve(null),
+  ]);
 
   function summarize(res: SafeFetchResult<PsiResponse>) {
     if (!res.ok) return null;
@@ -122,24 +265,75 @@ export async function GET(req: NextRequest) {
 
     return {
       fetchedAt: res.fetchedAt,
+      status: res.status,
       perfScore,
       metrics,
       opportunities: pickOpportunities(lhr),
-      raw: json,
+      field: pickFieldMetrics(json),
+      raw: includeRaw ? json : undefined,
+    };
+  }
+
+  function errorPayload(res: Extract<SafeFetchResult<PsiResponse>, { ok: false }>) {
+    const keyConfigured = !!process.env.PSI_API_KEY?.trim();
+    const isQuota = res.status === 429 || res.error.includes("HTTP 429");
+    const hint =
+      !keyConfigured && isQuota
+        ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
+        : null;
+    return {
+      error: res.error,
+      fetchedAt: res.fetchedAt,
+      status: res.status,
+      detail: debug && "detail" in res ? res.detail : undefined,
+      hint,
     };
   }
 
   const payload = {
-    url: v.url,
+    url: targetUrl,
     source: "pagespeed-insights",
+    apiKeyConfigured: !!process.env.PSI_API_KEY?.trim(),
     notes: [
       "This v1 uses PageSpeed Insights for a credible “why slow?” explanation.",
       "For a true request waterfall and CPU timeline, add a real-browser runner (Playwright) in v2.",
     ],
-    mobile: mobile.ok ? summarize(mobile) : { error: mobile.error, fetchedAt: mobile.fetchedAt },
-    desktop: desktop.ok ? summarize(desktop) : { error: desktop.error, fetchedAt: desktop.fetchedAt },
+    mobile:
+      mobile == null
+        ? null
+        : mobile.ok
+          ? summarize(mobile)
+          : errorPayload(mobile),
+    desktop:
+      desktop == null
+        ? null
+        : desktop.ok
+          ? summarize(desktop)
+          : errorPayload(desktop),
     trust: "untrusted",
   };
 
-  return Response.json(payload);
+  const errors: Array<{ status: number | null }> = [];
+  if (mobile && !mobile.ok) errors.push({ status: mobile.status });
+  if (desktop && !desktop.ok) errors.push({ status: desktop.status });
+
+  const mobileFailed = wantMobile ? mobile == null || !mobile.ok : true;
+  const desktopFailed = wantDesktop ? desktop == null || !desktop.ok : true;
+  const allFailed = mobileFailed && desktopFailed;
+
+  const any429 = errors.some((e) => e.status === 429);
+  const status = allFailed ? (any429 ? 429 : 502) : 200;
+
+  if (status !== 200) {
+    const firstError =
+      (mobile && !mobile.ok ? mobile.error : null) ?? (desktop && !desktop.ok ? desktop.error : null) ?? "upstream error";
+    (payload as Record<string, unknown>)["error"] = firstError;
+    const hint =
+      !process.env.PSI_API_KEY?.trim() && any429
+        ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
+        : null;
+    if (hint) (payload as Record<string, unknown>)["hint"] = hint;
+  }
+
+  return Response.json(payload, { status, headers: { "Cache-Control": "no-store" } });
 }
