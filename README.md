@@ -21,6 +21,11 @@ npm run dev
 npm run smoke
 ```
 
+## UI Notes
+
+- Use "Save run" to persist runs locally (localStorage) and compare A vs B.
+- Use "Download JSON" to export the latest run payload.
+
 ## Build
 
 ```bash
