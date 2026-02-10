@@ -7,6 +7,16 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function fetchWithTimeout(url, opts, timeoutMs) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function startDevServer() {
   const child = spawn("npm", ["run", "dev", "--", "-p", String(port)], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -87,8 +97,15 @@ async function main() {
   try {
     await waitForReady(child, 20_000);
 
+    // Sanity check the UI route. This catches obvious Next routing/build issues
+    // without depending on PSI quota or API keys.
+    const homeRes = await fetchWithTimeout(`${baseUrl}/`, { cache: "no-store" }, 10_000);
+    const homeText = await homeRes.text();
+    if (!homeRes.ok) throw new Error(`unexpected HTTP status for /: ${homeRes.status}`);
+    if (!homeText.includes("Page Load Lab")) throw new Error("unexpected homepage HTML (missing 'Page Load Lab')");
+
     const qs = new URLSearchParams({ url: "https://example.com", strategy: "both" });
-    const res = await fetch(`${baseUrl}/api/pageload?${qs.toString()}`, { cache: "no-store" });
+    const res = await fetchWithTimeout(`${baseUrl}/api/pageload?${qs.toString()}`, { cache: "no-store" }, 20_000);
     const text = await res.text();
     let json;
     try {

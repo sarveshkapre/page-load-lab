@@ -2,90 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PageLoadResponse, PsiError, PsiSummary } from "@/lib/pageloadTypes";
+import { downloadJson } from "@/lib/client/download";
+import {
+  type SavedRun,
+  RUNS_MAX,
+  loadSavedRuns,
+  persistSavedRuns,
+  stripRawFromResponse,
+} from "@/lib/client/savedRuns";
 
 function pct(n: number | null) {
   if (n == null) return "-";
   return `${Math.round(n * 100)}%`;
-}
-
-type SavedRun = {
-  id: string;
-  createdAt: string;
-  url: string;
-  strategy: "mobile" | "desktop" | "both";
-  data: PageLoadResponse;
-};
-
-const RUNS_KEY = "pll:savedRuns:v1";
-const RUNS_MAX = 20;
-
-function safeParseJson<T>(text: string): T | null {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
-}
-
-function loadRuns(): SavedRun[] {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(RUNS_KEY);
-  if (!raw) return [];
-  const parsed = safeParseJson<unknown>(raw);
-  if (!Array.isArray(parsed)) return [];
-  // Best-effort structural filtering.
-  return parsed
-    .filter((x): x is SavedRun => {
-      if (!x || typeof x !== "object") return false;
-      const r = x as Record<string, unknown>;
-      return (
-        typeof r.id === "string" &&
-        typeof r.createdAt === "string" &&
-        typeof r.url === "string" &&
-        (r.strategy === "mobile" || r.strategy === "desktop" || r.strategy === "both") &&
-        !!r.data &&
-        typeof r.data === "object"
-      );
-    })
-    .slice(0, RUNS_MAX);
-}
-
-function persistRuns(runs: SavedRun[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RUNS_KEY, JSON.stringify(runs.slice(0, RUNS_MAX)));
-  } catch {
-    // Ignore quota / serialization failures; saved runs are a convenience.
-  }
-}
-
-function downloadJson(filename: string, obj: unknown) {
-  if (typeof window === "undefined") return;
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function stripRawFromResult(x: PsiSummary | PsiError): PsiSummary | PsiError {
-  if (!isSummary(x)) return x;
-  // Avoid persisting huge payloads if someone later adds includeRaw.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { raw, ...rest } = x;
-  return rest;
-}
-
-function stripRawFromResponse(r: PageLoadResponse): PageLoadResponse {
-  return {
-    ...r,
-    mobile: r.mobile ? stripRawFromResult(r.mobile) : null,
-    desktop: r.desktop ? stripRawFromResult(r.desktop) : null,
-  };
 }
 
 export default function PageLoadLab() {
@@ -100,7 +28,7 @@ export default function PageLoadLab() {
   const [compareB, setCompareB] = useState<string>("");
 
   useEffect(() => {
-    const runs = loadRuns();
+    const runs = loadSavedRuns();
     setSavedRuns(runs);
     setCompareA(runs[0]?.id ?? "");
     setCompareB(runs[1]?.id ?? "");
@@ -143,7 +71,7 @@ export default function PageLoadLab() {
     };
     const next = [run, ...savedRuns].slice(0, RUNS_MAX);
     setSavedRuns(next);
-    persistRuns(next);
+    persistSavedRuns(next);
     // Auto-populate compare selections when helpful.
     setCompareA((cur) => cur || run.id);
     setCompareB((cur) => (cur && cur !== run.id ? cur : next[1]?.id ?? ""));
@@ -152,7 +80,7 @@ export default function PageLoadLab() {
   const onDeleteRun = (id: string) => {
     const next = savedRuns.filter((r) => r.id !== id);
     setSavedRuns(next);
-    persistRuns(next);
+    persistSavedRuns(next);
     if (compareA === id) setCompareA(next[0]?.id ?? "");
     if (compareB === id) setCompareB(next[1]?.id ?? "");
   };
@@ -247,7 +175,7 @@ export default function PageLoadLab() {
               className="rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 ring-1 ring-white/10 hover:bg-white/10"
               onClick={() => {
                 setSavedRuns([]);
-                persistRuns([]);
+                persistSavedRuns([]);
                 setCompareA("");
                 setCompareB("");
               }}
