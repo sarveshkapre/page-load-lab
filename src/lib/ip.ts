@@ -30,10 +30,3 @@ export function normalizeIp(input: string | null | undefined): string | null {
   if (isIPv4(s) || isIPv6(s)) return s;
   return null;
 }
-
-export function ipVersion(ip: string): "ipv4" | "ipv6" | "unknown" {
-  if (isIPv4(ip)) return "ipv4";
-  if (isIPv6(ip)) return "ipv6";
-  return "unknown";
-}
-

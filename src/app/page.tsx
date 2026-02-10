@@ -1,54 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-type PsiMetric = {
-  id: string;
-  title: string;
-  displayValue: string;
-  numericValue: number | null;
-  score: number | null;
-};
-
-type PsiOpportunity = {
-  id: string;
-  title: string;
-  description: string;
-  savingsMs: number | null;
-  displayValue: string;
-};
-
-type PsiSummary = {
-  fetchedAt: string;
-  status: number;
-  perfScore: number | null;
-  metrics: PsiMetric[];
-  opportunities: PsiOpportunity[];
-  field?: {
-    overallCategory: string | null;
-    metrics: Array<{ id: string; percentile: number | null; category: string | null }>;
-  } | null;
-  raw?: unknown;
-};
-
-type PsiError = {
-  error: string;
-  fetchedAt: string;
-  status: number | null;
-  detail?: string;
-  hint?: string | null;
-};
-
-type PageLoadResponse = {
-  url: string;
-  source: string;
-  apiKeyConfigured?: boolean;
-  error?: string;
-  hint?: string;
-  notes?: string[];
-  mobile: PsiSummary | PsiError | null;
-  desktop: PsiSummary | PsiError | null;
-};
+import type { PageLoadResponse, PsiError, PsiSummary } from "@/lib/pageloadTypes";
 
 function pct(n: number | null) {
   if (n == null) return "-";

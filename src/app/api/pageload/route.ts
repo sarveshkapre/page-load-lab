@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { SafeFetchResult, safeJsonFetch } from "@/lib/safeFetch";
 import { normalizeIp } from "@/lib/ip";
+import type { PageLoadResponse, PsiError, PsiSummary } from "@/lib/pageloadTypes";
 
 type PsiResponse = Record<string, unknown>;
 
@@ -197,6 +198,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: v.error }, { status: 400 });
   }
   const targetUrl = v.url;
+  const apiKeyConfigured = !!process.env.PSI_API_KEY?.trim();
 
   const wantMobile = strategyParam === "mobile" || strategyParam === "both";
   const wantDesktop = strategyParam === "desktop" || strategyParam === "both";
@@ -248,7 +250,7 @@ export async function GET(req: NextRequest) {
     wantDesktop ? getPsi("desktop") : Promise.resolve(null),
   ]);
 
-  function summarize(res: SafeFetchResult<PsiResponse>) {
+  function summarize(res: SafeFetchResult<PsiResponse>): PsiSummary | null {
     if (!res.ok) return null;
     const json = res.value;
     const lhr = (json["lighthouseResult"] ?? null) as LighthouseResult | null;
@@ -261,7 +263,7 @@ export async function GET(req: NextRequest) {
       pickAuditMetric(lhr, "cumulative-layout-shift"),
       pickAuditMetric(lhr, "total-blocking-time"),
       pickAuditMetric(lhr, "speed-index"),
-    ].filter(Boolean);
+    ].filter((m): m is NonNullable<typeof m> => m != null);
 
     return {
       fetchedAt: res.fetchedAt,
@@ -274,11 +276,10 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  function errorPayload(res: Extract<SafeFetchResult<PsiResponse>, { ok: false }>) {
-    const keyConfigured = !!process.env.PSI_API_KEY?.trim();
+  function errorPayload(res: Extract<SafeFetchResult<PsiResponse>, { ok: false }>): PsiError {
     const isQuota = res.status === 429 || res.error.includes("HTTP 429");
     const hint =
-      !keyConfigured && isQuota
+      !apiKeyConfigured && isQuota
         ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
         : null;
     return {
@@ -290,10 +291,10 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  const payload = {
+  const payload: PageLoadResponse = {
     url: targetUrl,
     source: "pagespeed-insights",
-    apiKeyConfigured: !!process.env.PSI_API_KEY?.trim(),
+    apiKeyConfigured,
     notes: [
       "This v1 uses PageSpeed Insights for a credible “why slow?” explanation.",
       "For a true request waterfall and CPU timeline, add a real-browser runner (Playwright) in v2.",
@@ -327,12 +328,12 @@ export async function GET(req: NextRequest) {
   if (status !== 200) {
     const firstError =
       (mobile && !mobile.ok ? mobile.error : null) ?? (desktop && !desktop.ok ? desktop.error : null) ?? "upstream error";
-    (payload as Record<string, unknown>)["error"] = firstError;
+    payload.error = firstError;
     const hint =
-      !process.env.PSI_API_KEY?.trim() && any429
+      !apiKeyConfigured && any429
         ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
         : null;
-    if (hint) (payload as Record<string, unknown>)["hint"] = hint;
+    if (hint) payload.hint = hint;
   }
 
   return Response.json(payload, { status, headers: { "Cache-Control": "no-store" } });
