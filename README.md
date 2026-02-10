@@ -15,6 +15,12 @@ npm install
 npm run dev
 ```
 
+## Smoke
+
+```bash
+npm run smoke
+```
+
 ## Build
 
 ```bash
