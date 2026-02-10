@@ -115,6 +115,8 @@ const OK_CACHE_TTL_MS = 5 * 60 * 1000;
 const ERR_CACHE_TTL_MS = 30 * 1000;
 const CACHE_MAX_ENTRIES = 25;
 
+const PSI_KEY_HINT = "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s.";
+
 type CacheEntry = { expiresAt: number; value: SafeFetchResult<PsiResponse> };
 const psiCache = new Map<string, CacheEntry>();
 
@@ -278,15 +280,12 @@ export async function GET(req: NextRequest) {
 
   function errorPayload(res: Extract<SafeFetchResult<PsiResponse>, { ok: false }>): PsiError {
     const isQuota = res.status === 429 || res.error.includes("HTTP 429");
-    const hint =
-      !apiKeyConfigured && isQuota
-        ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
-        : null;
+    const hint = !apiKeyConfigured && isQuota ? PSI_KEY_HINT : null;
     return {
       error: res.error,
       fetchedAt: res.fetchedAt,
       status: res.status,
-      detail: debug && "detail" in res ? res.detail : undefined,
+      detail: debug ? res.detail : undefined,
       hint,
     };
   }
@@ -314,25 +313,19 @@ export async function GET(req: NextRequest) {
     trust: "untrusted",
   };
 
-  const errors: Array<{ status: number | null }> = [];
-  if (mobile && !mobile.ok) errors.push({ status: mobile.status });
-  if (desktop && !desktop.ok) errors.push({ status: desktop.status });
-
   const mobileFailed = wantMobile ? mobile == null || !mobile.ok : true;
   const desktopFailed = wantDesktop ? desktop == null || !desktop.ok : true;
   const allFailed = mobileFailed && desktopFailed;
 
-  const any429 = errors.some((e) => e.status === 429);
+  const any429 =
+    (mobile != null && !mobile.ok && mobile.status === 429) || (desktop != null && !desktop.ok && desktop.status === 429);
   const status = allFailed ? (any429 ? 429 : 502) : 200;
 
   if (status !== 200) {
     const firstError =
       (mobile && !mobile.ok ? mobile.error : null) ?? (desktop && !desktop.ok ? desktop.error : null) ?? "upstream error";
     payload.error = firstError;
-    const hint =
-      !apiKeyConfigured && any429
-        ? "PSI quota is often very limited without an API key. Set PSI_API_KEY to reduce 429s."
-        : null;
+    const hint = !apiKeyConfigured && any429 ? PSI_KEY_HINT : null;
     if (hint) payload.hint = hint;
   }
 

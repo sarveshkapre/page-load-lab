@@ -43,7 +43,7 @@ async function main() {
   try {
     await waitForReady(child, 20_000);
 
-    const qs = new URLSearchParams({ url: "https://example.com", strategy: "mobile" });
+    const qs = new URLSearchParams({ url: "https://example.com", strategy: "both" });
     const res = await fetch(`${baseUrl}/api/pageload?${qs.toString()}`, { cache: "no-store" });
     const text = await res.text();
     let json;
@@ -53,8 +53,17 @@ async function main() {
       throw new Error(`expected JSON, got: ${text.slice(0, 200)}`);
     }
 
-    const okShape = json && typeof json === "object" && typeof json.url === "string" && ("mobile" in json || "error" in json);
-    if (!okShape) throw new Error("unexpected response shape from /api/pageload");
+    const obj = json && typeof json === "object" ? json : null;
+    const isRateLimitPayload =
+      obj && typeof obj.error === "string" && typeof obj.retryAfterSec === "number";
+    const isFullPayload =
+      obj &&
+      typeof obj.url === "string" &&
+      "mobile" in obj &&
+      "desktop" in obj;
+    if (!isRateLimitPayload && !isFullPayload) {
+      throw new Error("unexpected response shape from /api/pageload");
+    }
 
     // We accept 200 (key configured, happy path) or 429/502 (no key / quota / upstream).
     if (![200, 429, 502].includes(res.status)) {
@@ -71,4 +80,3 @@ main().catch((e) => {
   process.stderr.write(`${e instanceof Error ? e.stack : String(e)}\n`);
   process.exitCode = 1;
 });
-
