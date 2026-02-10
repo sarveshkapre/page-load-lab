@@ -153,9 +153,18 @@ type RateState = { resetAt: number; count: number };
 const rate = new Map<string, RateState>();
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 10;
+const RATE_PRUNE_THRESHOLD = 2000;
+
+function pruneRateLimit(now: number) {
+  if (rate.size <= RATE_PRUNE_THRESHOLD) return;
+  for (const [k, v] of rate) {
+    if (now >= v.resetAt) rate.delete(k);
+  }
+}
 
 function checkRateLimit(clientKey: string): { ok: true } | { ok: false; retryAfterSec: number } {
   const now = Date.now();
+  pruneRateLimit(now);
   const cur = rate.get(clientKey);
   if (!cur || now >= cur.resetAt) {
     rate.set(clientKey, { resetAt: now + RATE_WINDOW_MS, count: 1 });
