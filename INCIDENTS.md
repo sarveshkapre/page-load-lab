@@ -12,3 +12,13 @@
 - Confidence
 
 ## Entries
+
+### 2026-02-10: CI Smoke Hang
+- Trigger: GitHub Actions run hung during the `Smoke` step (`npm run smoke`).
+- Impact: CI runs did not complete; newer pushes queued/cancelled older runs.
+- Root Cause: Smoke script signaled the dev server but did not ensure process-tree termination; Node process stayed alive in CI.
+- Fix: Spawn dev server in its own process group and add SIGTERM then SIGKILL shutdown with timeouts.
+- Prevention Rule: Any smoke/e2e harness must have a deterministic shutdown path (process-group kill + hard timeout).
+- Evidence: GH Actions run stuck at `Smoke`; follow-up run `21866084918` completed successfully.
+- Commit: `5b4c202`
+- Confidence: high

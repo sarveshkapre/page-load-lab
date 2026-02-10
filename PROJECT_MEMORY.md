@@ -22,6 +22,7 @@
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
 - 2026-02-10 | Build failed after API refactor (TypeScript narrowing in nested closure) | TS control-flow narrowing does not carry into nested functions reliably | Hoisted `targetUrl` to a narrowed constant | Prefer narrowing into primitives (`const targetUrl = ...`) before nested helpers | 2f231dd | medium
+- 2026-02-10 | GitHub Actions CI hung on `npm run smoke` | Smoke script didn't reliably terminate the dev server process tree in CI | Spawn dev server in its own process group + SIGTERM then SIGKILL fallback | Smoke checks must have a hard shutdown path (process-group kill + timeout) | 5b4c202 | high
 
 ## Known Risks
 - In-memory caching/rate-limit is best-effort and may not hold across serverless instances; treat it as UX smoothing, not enforcement.
@@ -40,6 +41,7 @@
 - 2026-02-10 | `npm run lint` | eslint clean | pass
 - 2026-02-10 | `npm run build` | Next build successful | pass
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
+- 2026-02-10 | `gh run view 21866084918 --json status,conclusion` | `"status":"completed","conclusion":"success"` | pass
 - 2026-02-10 | `npm run lint` | eslint clean | pass
 - 2026-02-10 | `npm run build` | Next build successful | pass
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
