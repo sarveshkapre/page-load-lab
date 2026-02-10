@@ -8,21 +8,26 @@
 
 ## Candidate Features To Do
 
-- [ ] (Selected, cycle2) PSI API key support via `PSI_API_KEY` + clearer quota/HTTP error messaging
-- [ ] (Selected, cycle2) Reduce PSI quota burn: UI strategy selector (mobile/desktop/both) + server in-memory caching (short TTL)
-- [ ] (Selected, cycle2) Surface per-strategy errors in UI (show Mobile/Desktop error panels instead of failing silently)
-- [ ] (Selected, cycle2) Trim API payload size: exclude `raw` PSI JSON by default; opt-in with `includeRaw=1`
-- [ ] (Selected, cycle2) Align app branding + navigation with repo objective (remove dead links; "Page Load Lab" metadata)
-- [ ] (Selected, cycle2) Add a runnable local smoke path (`npm run smoke`) and document required env vars in README
+- [ ] Compare runs (before/after) with persisted run IDs and diffed opportunities/metrics
+- [ ] Add a v2 Playwright runner skeleton: trace + HAR artifacts + basic waterfall extraction
+- [ ] Add export/share: download JSON report + shareable link (later: signed URL)
+- [ ] Improve "why slow?" engine: rule-based reasons mapped from PSI audits/CrUX (with evidence + expected impact)
+- [ ] Add basic CI workflow (lint + build + smoke) with secrets-free default behavior
+- [ ] Add request waterfall visualization (v2) and screenshot/filmstrip integration
 
 ## Implemented
+
+- [x] 2026-02-10: PSI v1 hardening and UX fixes (key support, strategy selector, caching, clearer errors, smaller payloads, branding alignment)  
+  Evidence: `src/app/api/pageload/route.ts`, `src/app/page.tsx`, `src/lib/safeFetch.ts`, `src/app/layout.tsx`, `README.md`  
+  Verification: `npm run lint`, `npm run build`, `npm run smoke` (accepts `HTTP 429` when no `PSI_API_KEY`)  
+  Commits: `2f231dd`, `515acea`
 
 ## Insights
 
 ### Market Scan Notes (untrusted)
-- WebPageTest positions itself around multi-step testing, filmstrips/video, and deep-waterfall style analysis; these set baseline expectations for a "full story" report. (see WebPageTest docs)  
-- Lighthouse CI is commonly used for repeatable, CI-grade Lighthouse runs and report persistence/comparison. (see Lighthouse CI docs)  
-- Sitespeed.io is a popular open-source option combining real-browser runs (Browsertime) with budgets and dashboards, shaping parity expectations for v2 runners. (see sitespeed.io docs)
+- WebPageTest positions itself around multi-step testing, filmstrips/video, and deep-waterfall style analysis; these set baseline expectations for a "full story" report: `https://docs.webpagetest.org/`
+- Lighthouse CI is commonly used for repeatable, CI-grade Lighthouse runs and report persistence/comparison: `https://github.com/GoogleChrome/lighthouse-ci`
+- Sitespeed.io is a popular open-source option combining real-browser runs (Browsertime) with budgets and dashboards, shaping parity expectations for v2 runners: `https://www.sitespeed.io/`
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
