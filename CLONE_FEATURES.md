@@ -40,6 +40,14 @@ Backlog:
   Evidence: `src/lib/pageloadTypes.ts`, `src/app/api/pageload/route.ts`, `src/app/page.tsx`, `src/lib/ip.ts`, `scripts/smoke.mjs`  
   Verification: `npm run lint`, `npm run build`, `npm run smoke`  
   Commits: `eb70c0a`, `dcaa7af`
+- [x] 2026-02-10: Extract browser-only helpers (saved runs + JSON download) and harden smoke with `/` check + fetch timeouts  
+  Evidence: `src/lib/client/savedRuns.ts`, `src/lib/client/download.ts`, `src/app/page.tsx`, `scripts/smoke.mjs`  
+  Verification: `npm run lint`, `npm run build`, `npm run smoke`  
+  Commits: `48bff3d`
+- [x] 2026-02-10: Prune expired entries from the in-memory rate-limit map (avoid unbounded growth in long-lived processes)  
+  Evidence: `src/app/api/pageload/route.ts`  
+  Verification: `npm run lint`, `npm run build`, `npm run smoke`  
+  Commits: `16f3968`
 
 ## Insights
 

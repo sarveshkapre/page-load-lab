@@ -7,6 +7,7 @@
 - Next.js (App Router) UI at `/` with a single URL input and PSI-derived summaries.
 - Server route `GET /api/pageload` calls PageSpeed Insights v5 and returns a trimmed, UI-friendly payload.
 - Local reliability helpers: `src/lib/safeFetch.ts` (timeouts + safe JSON fetch), short in-memory caching + rate limiting (best-effort).
+- Client-only helpers: `src/lib/client/*` for localStorage-backed saved runs and JSON downloads (keeps `src/app/page.tsx` smaller).
 
 ## Open Problems
 - PSI quota frequently returns `HTTP 429` without `PSI_API_KEY`; smoke validates response-shape + graceful handling, not successful PSI runs.
@@ -18,6 +19,8 @@
 - 2026-02-10 | Centralize API/UI response types in `src/lib/pageloadTypes.ts` and tighten PSI route/smoke assertions | Reduce type drift and strengthen local verification without behavior change | `npm run lint`, `npm run build`, `npm run smoke` | eb70c0a, dcaa7af | high | trusted
 - 2026-02-10 | Add secrets-free GitHub Actions CI (lint/build/smoke) | Catch regressions on main without requiring `PSI_API_KEY` | Local `npm run lint`, `npm run build`, `npm run smoke` | ed96a07 | high | trusted
 - 2026-02-10 | Add local saved runs + A/B compare + JSON exports in UI | Unlock “before/after” workflows without backend persistence | `npm run lint`, `npm run build`, `npm run smoke` | 259888e | medium | trusted
+- 2026-02-10 | Extract browser-only helpers from `src/app/page.tsx` and harden smoke (check `/` + fetch timeouts) | Improve readability and reduce risk of smoke hangs while keeping behavior the same | `npm run lint`, `npm run build`, `npm run smoke` | 48bff3d | high | trusted
+- 2026-02-10 | Prune expired entries from the in-memory rate-limit map | Avoid unbounded memory growth in long-lived processes; semantics unchanged for active windows | `npm run lint`, `npm run build`, `npm run smoke` | 16f3968 | high | trusted
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
@@ -43,6 +46,9 @@
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
 - 2026-02-10 | `gh run view 21866084918 --json status,conclusion` | `"status":"completed","conclusion":"success"` | pass
 - 2026-02-10 | `gh run view 21866189563 --json status,conclusion` | `"status":"completed","conclusion":"success"` | pass
+- 2026-02-10 | `npm run lint` | eslint clean | pass
+- 2026-02-10 | `npm run build` | Next build successful | pass
+- 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
 - 2026-02-10 | `npm run lint` | eslint clean | pass
 - 2026-02-10 | `npm run build` | Next build successful | pass
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
