@@ -16,6 +16,8 @@
 - 2026-02-10 | Add `PSI_API_KEY` support + strategy selector + short TTL cache + better error propagation | Reduce quota burn and fix silent failures when PSI errors | `npm run smoke` returns well-formed response even when PSI is quota-limited | 2f231dd, 515acea | high | trusted
 - 2026-02-10 | Add `npm run smoke` + `.env.example` and allow committing `.env.example` | Ensure a runnable local verification path and document env expectations | `npm run smoke` prints `smoke ok` | 515acea | high | trusted
 - 2026-02-10 | Centralize API/UI response types in `src/lib/pageloadTypes.ts` and tighten PSI route/smoke assertions | Reduce type drift and strengthen local verification without behavior change | `npm run lint`, `npm run build`, `npm run smoke` | eb70c0a, dcaa7af | high | trusted
+- 2026-02-10 | Add secrets-free GitHub Actions CI (lint/build/smoke) | Catch regressions on main without requiring `PSI_API_KEY` | Local `npm run lint`, `npm run build`, `npm run smoke` | ed96a07 | high | trusted
+- 2026-02-10 | Add local saved runs + A/B compare + JSON exports in UI | Unlock “before/after” workflows without backend persistence | `npm run lint`, `npm run build`, `npm run smoke` | 259888e | medium | trusted
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
@@ -26,8 +28,8 @@
 
 ## Next Prioritized Tasks
 - Add a v2 Playwright runner skeleton (trace/HAR artifacts) and basic waterfall extraction.
-- Add “compare runs” persistence and diffs.
-- Add a secrets-free CI workflow (lint/build/smoke).
+- Improve "why slow?" reasoning by mapping PSI audits/CrUX into a smaller set of concrete, evidence-backed causes.
+- Add shareable links for saved runs (likely needs persistence or signed storage).
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
@@ -35,6 +37,9 @@
 - 2026-02-10 | `npm run lint` | eslint clean | pass
 - 2026-02-10 | `npm run build` | Next build successful | pass
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` (no `PSI_API_KEY`) | pass
+- 2026-02-10 | `npm run lint` | eslint clean | pass
+- 2026-02-10 | `npm run build` | Next build successful | pass
+- 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass
 - 2026-02-10 | `npm run lint` | eslint clean | pass
 - 2026-02-10 | `npm run build` | Next build successful | pass
 - 2026-02-10 | `npm run smoke` | `smoke ok: HTTP 429` | pass

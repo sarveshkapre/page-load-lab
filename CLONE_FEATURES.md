@@ -10,15 +10,7 @@
 
 Scoring (1-5 each): impact, effort (lower is better), strategic fit, differentiation, risk (lower is better), confidence.
 
-Cycle 3 selection (execute this session):
-- [ ] Add basic CI workflow (lint + build + smoke) with secrets-free default behavior
-  Score: impact 5, effort 2, fit 5, diff 2, risk 1, confidence 5
-- [ ] Compare runs (before/after) with persisted run IDs and diffed opportunities/metrics (local-only v1)
-  Score: impact 5, effort 3, fit 5, diff 4, risk 2, confidence 4
-- [ ] Add export/share: download JSON report for a run (shareable link later)
-  Score: impact 3, effort 1, fit 4, diff 2, risk 1, confidence 5
-
-Backlog (not selected this session):
+Backlog:
 - [ ] Add a v2 Playwright runner skeleton: trace + HAR artifacts + basic waterfall extraction
   Score: impact 5, effort 4, fit 5, diff 5, risk 3, confidence 3
 - [ ] Improve "why slow?" engine: rule-based reasons mapped from PSI audits/CrUX (with evidence + expected impact)
@@ -32,6 +24,14 @@ Backlog (not selected this session):
 
 ## Implemented
 
+- [x] 2026-02-10: Add secrets-free CI workflow (lint + build + smoke)
+  Evidence: `.github/workflows/ci.yml`
+  Verification: `npm run lint`, `npm run build`, `npm run smoke`
+  Commits: `ed96a07`
+- [x] 2026-02-10: Save runs locally + compare A vs B + download JSON exports
+  Evidence: `src/app/page.tsx`, `README.md`
+  Verification: `npm run lint`, `npm run build`, `npm run smoke`
+  Commits: `259888e`
 - [x] 2026-02-10: PSI v1 hardening and UX fixes (key support, strategy selector, caching, clearer errors, smaller payloads, branding alignment)  
   Evidence: `src/app/api/pageload/route.ts`, `src/app/page.tsx`, `src/lib/safeFetch.ts`, `src/app/layout.tsx`, `README.md`  
   Verification: `npm run lint`, `npm run build`, `npm run smoke` (accepts `HTTP 429` when no `PSI_API_KEY`)  
@@ -45,8 +45,11 @@ Backlog (not selected this session):
 
 ### Market Scan Notes (untrusted)
 - WebPageTest positions itself around multi-step testing, filmstrips/video, and deep-waterfall style analysis; these set baseline expectations for a "full story" report: `https://docs.webpagetest.org/`
+- WebPageTest scripting docs reinforce parity expectations for v2 runners (multi-step flows, login, custom actions): `https://docs.webpagetest.org/scripting/`
 - Lighthouse CI is commonly used for repeatable, CI-grade Lighthouse runs and report persistence/comparison: `https://github.com/GoogleChrome/lighthouse-ci`
+- Lighthouse CI docs highlight a common baseline: collect Lighthouse reports, upload/store, and assert budgets in CI: `https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/getting-started.md`
 - Sitespeed.io is a popular open-source option combining real-browser runs (Browsertime) with budgets and dashboards, shaping parity expectations for v2 runners: `https://www.sitespeed.io/`
+- Sitespeed/Browsertime emphasizes real-browser artifacts (HAR, video/visual metrics, traces) as a baseline expectation for runner v2: `https://www.sitespeed.io/documentation/browsertime/`
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
