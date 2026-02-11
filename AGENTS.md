@@ -9,7 +9,7 @@
 
 ## Mutable Repo Facts
 - Objective: Ship a page load profiler (PSI v1; Playwright runner v2). See plan.md.
-- Last updated: 2026-02-10T13:10:48Z
+- Last updated: 2026-02-11T05:42:30Z
 
 ## Verification Policy
 - Record exact verification commands and pass/fail outcomes in PROJECT_MEMORY.md.
