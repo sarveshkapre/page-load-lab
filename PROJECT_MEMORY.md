@@ -52,7 +52,8 @@
 - 2026-02-11 | `npm run lint` | eslint clean | pass
 - 2026-02-11 | `npm run build` | Next build successful (route includes `/api/pageload`) | pass
 - 2026-02-11 | `npm run smoke` | `smoke ok: HTTP 429` | pass
-- 2026-02-11 | `gh run list --limit 5 --json databaseId,headSha,status,conclusion,name,createdAt,displayTitle` | new CI run for `152f297` created (`status":"queued"`) | pass
+- 2026-02-11 | `gh run list --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName,createdAt,updatedAt,displayTitle` | run `21894128370` for `152f297` completed with `"conclusion":"success"` | pass
+- 2026-02-11 | `gh run watch 21894147619 --exit-status` | workflow `ci` for `2b3a541` finished successfully (build job passed lint/build/smoke) | pass
 - 2026-02-10 | `gh run view 21866084918 --json status,conclusion` | `"status":"completed","conclusion":"success"` | pass
 - 2026-02-10 | `gh run view 21866189563 --json status,conclusion` | `"status":"completed","conclusion":"success"` | pass
 - 2026-02-10 | `npm run lint` | eslint clean | pass
