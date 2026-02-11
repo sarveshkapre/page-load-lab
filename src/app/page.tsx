@@ -16,6 +16,18 @@ function pct(n: number | null) {
   return `${Math.round(n * 100)}%`;
 }
 
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs: number): Promise<{ res: Response; json: T }> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+    const json = (await res.json()) as T;
+    return { res, json };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export default function PageLoadLab() {
   const [url, setUrl] = useState("https://example.com");
   const [strategy, setStrategy] = useState<"mobile" | "desktop" | "both">("mobile");
@@ -40,14 +52,17 @@ export default function PageLoadLab() {
     setData(null);
     try {
       const qs = new URLSearchParams({ url: url.trim(), strategy });
-      const res = await fetch(`/api/pageload?${qs.toString()}`, { cache: "no-store" });
-      const json = (await res.json()) as PageLoadResponse;
+      const { res, json } = await fetchJsonWithTimeout<PageLoadResponse>(`/api/pageload?${qs.toString()}`, 20_000);
       setData(json);
       if (!res.ok) {
         const maybeError = (json as unknown as Record<string, unknown>)["error"];
         setErr(typeof maybeError === "string" ? maybeError : `HTTP ${res.status}`);
       }
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        setErr("Request timed out after 20s. Try again or test one strategy at a time.");
+        return;
+      }
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
@@ -285,6 +300,18 @@ function formatDelta(n: number | null) {
   return `${sign}${n}`;
 }
 
+function severityTone(severity: "high" | "medium" | "low") {
+  if (severity === "high") return "bg-red-500/10 text-red-200 ring-red-400/25";
+  if (severity === "medium") return "bg-amber-500/10 text-amber-200 ring-amber-400/25";
+  return "bg-emerald-500/10 text-emerald-200 ring-emerald-400/25";
+}
+
+function impactTone(impact: "high" | "medium" | "low") {
+  if (impact === "high") return "bg-sky-500/10 text-sky-100 ring-sky-400/25";
+  if (impact === "medium") return "bg-indigo-500/10 text-indigo-100 ring-indigo-400/25";
+  return "bg-white/10 text-white/70 ring-white/15";
+}
+
 function pickSummaryPair(a: PsiSummary | PsiError | null, b: PsiSummary | PsiError | null) {
   const sa = a && isSummary(a) ? a : null;
   const sb = b && isSummary(b) ? b : null;
@@ -508,6 +535,49 @@ function ResultPanel({ label, result }: { label: string; result: PsiSummary | Ps
                 <div className="text-right font-mono text-xs text-white/85">
                   {m.percentile != null ? `p75 ${Math.round(m.percentile)}` : "-"}
                   {m.category ? ` (${m.category})` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {summary.reasons?.length ? (
+        <div className="mt-6 grid gap-3">
+          <div className="text-xs font-semibold text-white/70">Ranked likely causes</div>
+          <div className="grid gap-2">
+            {summary.reasons.map((r) => (
+              <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 p-3 ring-1 ring-white/10">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold text-white/85">{r.title}</div>
+                  <span
+                    className={[
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1",
+                      severityTone(r.severity),
+                    ].join(" ")}
+                  >
+                    severity {r.severity}
+                  </span>
+                  <span
+                    className={[
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1",
+                      impactTone(r.expectedImpact),
+                    ].join(" ")}
+                  >
+                    impact {r.expectedImpact}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-1">
+                  {r.evidence.map((item, i) => (
+                    <div key={`${r.id}-e-${i}`} className="text-xs text-white/60">
+                      evidence: {item}
+                    </div>
+                  ))}
+                  {r.recommendedFixes.map((item, i) => (
+                    <div key={`${r.id}-f-${i}`} className="text-xs text-white/70">
+                      fix: {item}
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

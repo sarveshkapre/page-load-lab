@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { SafeFetchResult, safeJsonFetch } from "@/lib/safeFetch";
 import { normalizeIp } from "@/lib/ip";
 import type { PageLoadResponse, PsiError, PsiSummary } from "@/lib/pageloadTypes";
+import { buildWhySlowDiagnoses } from "@/lib/whySlow";
 
 type PsiResponse = Record<string, unknown>;
 
@@ -267,6 +268,8 @@ export async function GET(req: NextRequest) {
     const lhr = (json["lighthouseResult"] ?? null) as LighthouseResult | null;
     const perfScore =
       typeof lhr?.categories?.performance?.score === "number" ? lhr.categories.performance.score : null;
+    const opportunities = pickOpportunities(lhr);
+    const field = pickFieldMetrics(json);
     const metrics = [
       pickAuditMetric(lhr, "server-response-time"),
       pickAuditMetric(lhr, "largest-contentful-paint"),
@@ -281,8 +284,9 @@ export async function GET(req: NextRequest) {
       status: res.status,
       perfScore,
       metrics,
-      opportunities: pickOpportunities(lhr),
-      field: pickFieldMetrics(json),
+      opportunities,
+      reasons: buildWhySlowDiagnoses({ perfScore, metrics, opportunities, field }),
+      field,
       raw: includeRaw ? json : undefined,
     };
   }

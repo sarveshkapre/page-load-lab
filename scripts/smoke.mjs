@@ -92,6 +92,37 @@ async function waitForReady(child, timeoutMs) {
   }
 }
 
+function isSummaryLike(input) {
+  return (
+    input &&
+    typeof input === "object" &&
+    "perfScore" in input &&
+    "metrics" in input &&
+    "opportunities" in input
+  );
+}
+
+function assertDiagnosisShape(summary) {
+  if (!Array.isArray(summary.reasons)) {
+    throw new Error("expected summary.reasons to be an array");
+  }
+  for (const reason of summary.reasons) {
+    if (!reason || typeof reason !== "object") {
+      throw new Error("expected every diagnosis reason to be an object");
+    }
+    if (
+      typeof reason.id !== "string" ||
+      typeof reason.title !== "string" ||
+      !["high", "medium", "low"].includes(reason.severity) ||
+      !["high", "medium", "low"].includes(reason.expectedImpact) ||
+      !Array.isArray(reason.evidence) ||
+      !Array.isArray(reason.recommendedFixes)
+    ) {
+      throw new Error("unexpected diagnosis reason shape");
+    }
+  }
+}
+
 async function main() {
   const child = startDevServer();
   try {
@@ -124,6 +155,13 @@ async function main() {
       "desktop" in obj;
     if (!isRateLimitPayload && !isFullPayload) {
       throw new Error("unexpected response shape from /api/pageload");
+    }
+
+    if (isFullPayload) {
+      const summaries = [obj.mobile, obj.desktop].filter(isSummaryLike);
+      for (const summary of summaries) {
+        assertDiagnosisShape(summary);
+      }
     }
 
     // We accept 200 (key configured, happy path) or 429/502 (no key / quota / upstream).

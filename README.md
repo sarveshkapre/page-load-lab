@@ -25,6 +25,8 @@ npm run smoke
 
 - Use "Save run" to persist runs locally (localStorage) and compare A vs B.
 - Use "Download JSON" to export the latest run payload.
+- Each successful profile now includes ranked likely causes with severity, expected impact, evidence, and suggested fixes.
+- Frontend run requests timeout after 20s with a clear retry hint.
 
 ## Build
 

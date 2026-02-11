@@ -14,6 +14,15 @@ export type PsiOpportunity = {
   displayValue: string;
 };
 
+export type PsiDiagnosis = {
+  id: string;
+  title: string;
+  severity: "high" | "medium" | "low";
+  expectedImpact: "high" | "medium" | "low";
+  evidence: string[];
+  recommendedFixes: string[];
+};
+
 export type PsiFieldData = {
   overallCategory: string | null;
   metrics: Array<{ id: string; percentile: number | null; category: string | null }>;
@@ -25,6 +34,7 @@ export type PsiSummary = {
   perfScore: number | null;
   metrics: PsiMetric[];
   opportunities: PsiOpportunity[];
+  reasons?: PsiDiagnosis[];
   field?: PsiFieldData | null;
   raw?: unknown;
 };
@@ -50,4 +60,3 @@ export type PageLoadResponse = {
   desktop: PsiResult | null;
   trust?: string;
 };
-

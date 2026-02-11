@@ -11,16 +11,36 @@
 Scoring (1-5 each): impact, effort (lower is better), strategic fit, differentiation, risk (lower is better), confidence.
 
 Backlog:
-- [ ] Add a v2 Playwright runner skeleton: trace + HAR artifacts + basic waterfall extraction
+- [ ] (Selected, cycle 1) Improve "why slow?" engine with rule-based causes from PSI audits + CrUX field data (evidence + recommended fixes + expected impact)
+  Score: impact 5, effort 3, fit 5, diff 4, risk 2, confidence 4
+- [ ] (Selected, cycle 1) Expose ranked causes in UI with severity/impact badges and concise evidence/fix bullets
+  Score: impact 5, effort 3, fit 5, diff 4, risk 2, confidence 4
+- [ ] (Selected, cycle 1) Add client-side run timeout and clearer timeout messaging for API fetch failures
+  Score: impact 4, effort 2, fit 5, diff 3, risk 1, confidence 5
+- [ ] (Selected, cycle 1) Harden smoke assertions for successful summary payloads to include new diagnosis shape
+  Score: impact 3, effort 2, fit 4, diff 2, risk 1, confidence 5
+- [ ] (Selected, cycle 1) Refresh docs/memory trackers and verification evidence for delivered diagnosis improvements
+  Score: impact 4, effort 2, fit 5, diff 2, risk 1, confidence 5
+- [ ] Add a v2 Playwright runner skeleton: trace + HAR-like request artifacts + basic waterfall extraction
   Score: impact 5, effort 4, fit 5, diff 5, risk 3, confidence 3
-- [ ] Improve "why slow?" engine: rule-based reasons mapped from PSI audits/CrUX (with evidence + expected impact)
-  Score: impact 4, effort 3, fit 5, diff 4, risk 2, confidence 3
 - [ ] Add request waterfall visualization (v2) and screenshot/filmstrip integration
   Score: impact 4, effort 4, fit 5, diff 4, risk 3, confidence 3
 - [ ] Add multi-run mode (N repeats; median + variability) and make compare runs robust against noise
   Score: impact 4, effort 4, fit 4, diff 4, risk 2, confidence 3
 - [ ] Add saved artifacts folder convention (runs stored locally under `runs/` ignored by git) and UI import
   Score: impact 3, effort 3, fit 4, diff 3, risk 1, confidence 4
+- [ ] Add Lighthouse/LCP performance budgets with fail thresholds suitable for CI smoke gates
+  Score: impact 4, effort 3, fit 4, diff 3, risk 2, confidence 3
+- [ ] Add locale selector and explicit run metadata to improve reproducibility across regions
+  Score: impact 3, effort 2, fit 4, diff 2, risk 1, confidence 4
+- [ ] Add saved-run import (JSON) with schema validation for team-sharing workflows
+  Score: impact 3, effort 3, fit 3, diff 3, risk 2, confidence 3
+- [ ] Add an audit details drilldown panel to explain exactly which PSI audit triggered each diagnosis rule
+  Score: impact 4, effort 3, fit 4, diff 4, risk 2, confidence 3
+- [ ] Add compare-mode summary deltas for field metrics categories (good/NI/poor transitions)
+  Score: impact 3, effort 2, fit 4, diff 3, risk 1, confidence 4
+- [ ] Add API-level contract tests for `/api/pageload` payload schema with mocked PSI responses
+  Score: impact 4, effort 3, fit 4, diff 2, risk 1, confidence 4
 
 ## Implemented
 
